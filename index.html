@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Sesgos y Verificación de Datos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                            900: '#1e3a8a',
+                        },
+                        risk: {
+                            low: '#10b981',
+                            medium: '#f59e0b',
+                            high: '#ef4444'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom gauge animations and styling */
+        .gauge-circle {
+            transition: stroke-dashoffset 1s ease-in-out;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col justify-between selection:bg-blue-200">
+
+    <!-- Header Section -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/30">
+                    <i class="fa-solid fa-magnifying-glass-chart text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        FactCheck & Bias Guard
+                        <span class="text-xs bg-blue-500/20 text-blue-300 font-medium px-2 py-0.5 rounded-full border border-blue-400/30">v2.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Verificador inteligente de veracidad, sesgos y objetividad en textos</p>
+                </div>
+            </div>
+            
+            <!-- Author Mention (Header) -->
+            <div class="bg-slate-800/80 px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300 flex items-center gap-2">
+                <i class="fa-solid fa-user-gear text-blue-400"></i>
+                <span>Desarrollado por <strong class="text-white font-semibold">Lizbeth Belinda Chura Lima</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+        
+        <!-- Intro Banner -->
+        <div class="mb-8 bg-blue-50 border border-blue-200 rounded-2xl p-5 sm:p-6 text-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+            <div class="space-y-1">
+                <h2 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-blue-600"></i>
+                    Validación rigurosa pre-publicación
+                </h2>
+                <p class="text-sm text-slate-600 max-w-3xl">
+                    Analiza borradores, fragmentos generados por IA, noticias o informes académicos antes de citarlos. Detecta lenguaje sesgado, afirmaciones absolutas sin fuentes, contenido engañoso o de riesgo financiero y de salud.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Ejemplos rápidos:</span>
+                <button onclick="loadSample('bias')" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-400 text-xs font-medium rounded-lg shadow-sm transition hover:bg-slate-50 text-slate-700">Sesgado / IA</button>
+                <button onclick="loadSample('health')" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-amber-400 text-xs font-medium rounded-lg shadow-sm transition hover:bg-slate-50 text-slate-700">Salud / Riesgo</button>
+                <button onclick="loadSample('neutral')" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-emerald-400 text-xs font-medium rounded-lg shadow-sm transition hover:bg-slate-50 text-slate-700">Neutral</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Panel: Input Editor -->
+            <section class="lg:col-span-5 flex flex-col gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full">
+                    <div class="flex justify-between items-center mb-3">
+                        <label for="inputText" class="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                            <i class="fa-solid fa-file-lines text-slate-400"></i>
+                            Texto a analizar
+                        </label>
+                        <span id="charCount" class="text-xs text-slate-400">0 caracteres</span>
+                    </div>
+
+                    <textarea id="inputText" rows="14" placeholder="Pega aquí el texto, informe, fragmento o borrador que deseas verificar..." class="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm text-slate-700 resize-none flex-grow bg-slate-50/50 focus:bg-white"></textarea>
+
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <button onclick="clearText()" class="px-4 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition flex items-center gap-2" title="Limpiar todo">
+                            <i class="fa-solid fa-trash-can"></i> Limpiar
+                        </button>
+
+                        <button id="analyzeBtn" onclick="analyzeText()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl shadow-md shadow-blue-500/20 transition flex items-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>Analizar Texto</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Analysis Report Output -->
+            <section class="lg:col-span-7">
+                
+                <!-- Initial State Placeholder -->
+                <div id="placeholderState" class="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[450px]">
+                    <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-magnifying-glass text-2xl"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-800 mb-1">Esperando análisis</h3>
+                    <p class="text-sm text-slate-500 max-w-sm mb-6">Pega un párrafo arriba o selecciona un texto de ejemplo para comprobar si requiere verificación de datos.</p>
+                    <div class="flex flex-wrap justify-center gap-2 text-xs text-slate-400">
+                        <span class="bg-slate-100 px-3 py-1 rounded-full"><i class="fa-solid fa-check text-emerald-500 mr-1"></i> Sesgos de lenguaje</span>
+                        <span class="bg-slate-100 px-3 py-1 rounded-full"><i class="fa-solid fa-check text-emerald-500 mr-1"></i> Afirmaciones absolutas</span>
+                        <span class="bg-slate-100 px-3 py-1 rounded-full"><i class="fa-solid fa-check text-emerald-500 mr-1"></i> Falta de fuentes</span>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingState" class="hidden bg-white border border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[450px]">
+                    <div class="relative w-20 h-20 mb-6">
+                        <div class="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        <i class="fa-solid fa-microchip text-blue-600 text-xl absolute inset-0 m-auto"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-2">Evaluando rigurosidad y sesgos...</h3>
+                    <p id="loadingMsg" class="text-sm text-slate-500 max-w-sm">Escaneando afirmaciones absolutas, subjetividad y riesgo de desinformación.</p>
+                </div>
+
+                <!-- Active Report Output -->
+                <div id="reportOutput" class="hidden space-y-6 animate-fade-in">
+                    
+                    <!-- Top Summary Card: Score & Risk Gauge -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                        
+                        <!-- Gauge Display -->
+                        <div class="sm:col-span-5 flex flex-col items-center border-b sm:border-b-0 sm:border-r border-slate-100 pb-6 sm:pb-0 sm:pr-6">
+                            <div class="relative w-36 h-36 flex items-center justify-center">
+                                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                    <!-- Background Circle -->
+                                    <path class="text-slate-100" stroke-width="3.8" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <!-- Dynamic Progress Circle -->
+                                    <path id="gaugePath" class="gauge-circle text-blue-500" stroke-linecap="round" stroke-width="3.8" stroke-dasharray="0, 100" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                </svg>
+                                <div class="absolute flex flex-col items-center text-center">
+                                    <span id="scoreVal" class="text-3xl font-extrabold text-slate-900">0%</span>
+                                    <span class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">Fiabilidad</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Risk Verdict Header -->
+                        <div class="sm:col-span-7 flex flex-col justify-center space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nivel de Riesgo:</span>
+                                <span id="riskBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
+                                    Sin determinar
+                                </span>
+                            </div>
+                            <h3 id="verdictTitle" class="text-xl font-bold text-slate-900">
+                                Resumen general
+                            </h3>
+                            <p id="verdictSummary" class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                                El texto presenta diversas inconsistencias que requieren verificación previa.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Warnings & Detailed Findings -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                                Hallazgos y Advertencias Detalladas
+                            </h4>
+                            <span id="findingsCount" class="text-xs font-medium px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-full">0 hallazgos</span>
+                        </div>
+
+                        <div id="findingsContainer" class="space-y-3">
+                            <!-- Dynamic findings list appended here -->
+                        </div>
+                    </div>
+
+                    <!-- Actionable Checklist / Recommendations -->
+                    <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-sm space-y-4">
+                        <h4 class="font-bold text-sm flex items-center gap-2 text-blue-400">
+                            <i class="fa-solid fa-list-check"></i>
+                            Veredicto Final y Pasos a Seguir
+                        </h4>
+                        <ul id="recommendationsList" class="space-y-2 text-xs sm:text-sm text-slate-300">
+                            <!-- Dynamic recommendations -->
+                        </ul>
+                    </div>
+
+                    <!-- Export / Share Bar -->
+                    <div class="flex items-center justify-between bg-slate-100 p-4 rounded-xl text-xs text-slate-500">
+                        <span>¿Deseas guardar este informe?</span>
+                        <button onclick="copyReport()" class="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 font-medium rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-regular fa-copy"></i> Copiar informe
+                        </button>
+                    </div>
+
+                </div>
+
+            </section>
+        </div>
+
+    </main>
+
+    <!-- Footer Section -->
+    <footer class="bg-slate-900 text-slate-400 border-t border-slate-800 py-6 mt-12 text-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-shield-cat text-blue-500 text-base"></i>
+                <span>FactCheck & Bias Guard &copy; 2026 - Herramienta de Verificación Pre-Publicación</span>
+            </div>
+            
+            <!-- Author Mention (Footer) -->
+            <div class="text-slate-300 font-medium bg-slate-800/50 px-3 py-1.5 rounded-md border border-slate-700/50">
+                Desarrollado por <span class="text-blue-400 font-semibold">Lizbeth Belinda Chura Lima</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 text-xs font-medium transition-all duration-300 transform translate-y-20 opacity-0 flex items-center gap-2 z-50">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">Mensaje</span>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // DOM Elements
+        const inputText = document.getElementById('inputText');
+        const charCount = document.getElementById('charCount');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const placeholderState = document.getElementById('placeholderState');
+        const loadingState = document.getElementById('loadingState');
+        const reportOutput = document.getElementById('reportOutput');
+        
+        const scoreVal = document.getElementById('scoreVal');
+        const gaugePath = document.getElementById('gaugePath');
+        const riskBadge = document.getElementById('riskBadge');
+        const verdictTitle = document.getElementById('verdictTitle');
+        const verdictSummary = document.getElementById('verdictSummary');
+        const findingsCount = document.getElementById('findingsCount');
+        const findingsContainer = document.getElementById('findingsContainer');
+        const recommendationsList = document.getElementById('recommendationsList');
+
+        // Text listener for character counter
+        inputText.addEventListener('input', () => {
+            const count = inputText.value.length;
+            charCount.textContent = `${count} carácter${count !== 1 ? 'es' : ''}`;
+        });
+
+        // Sample Text Presets
+        const SAMPLES = {
+            bias: "Es absolutamente indiscutible que los asistentes de inteligencia artificial reemplazarán al 100% de los redactores humanos en el año 2027. Todos los expertos sensatos coinciden en que la escritura humana ha quedado obsoleta y carece de valor profesional. CUALQUIERA que siga contratando periodistas en lugar de usar IA está cometiendo un grave e imperdonable error financiero.",
+            
+            health: "Un revolucionario estudio secreto elaborado por científicos independientes ha demostrado que beber 3 litros de agua ionizada con extracto de semilla de papaya cura definitivamente el insomnio y regula la glucosa en tan solo 48 horas sin necesidad de ningún tratamiento médico. Este tratamiento natural garantiza resultados inmediatos sin efectos secundarios.",
+            
+            neutral: "De acuerdo con el informe publicado por la Organización Mundial de la Salud en 2024, el consumo moderado de agua potable y el descanso regular contribuyen al bienestar general. Diversos estudios clínicos indican que mantener hábitos de vida saludables puede reducir factores de riesgo asociados a enfermedades metabólicas, aunque se recomienda la supervisión de un médico especialista."
+        };
+
+        function loadSample(key) {
+            inputText.value = SAMPLES[key];
+            inputText.dispatchEvent(new Event('input'));
+            showToast("Ejemplo cargado correctamente");
+        }
+
+        function clearText() {
+            inputText.value = '';
+            inputText.dispatchEvent(new Event('input'));
+            placeholderState.classList.remove('hidden');
+            loadingState.classList.add('hidden');
+            reportOutput.classList.add('hidden');
+            showToast("Campos limpiados");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Main Analysis Call
+        async function analyzeText() {
+            const text = inputText.value.trim();
+            if (!text) {
+                showToast("Por favor, ingresa un texto para analizar");
+                return;
+            }
+
+            if (text.length < 15) {
+                showToast("Escribe un texto más extenso para obtener resultados precisos");
+                return;
+            }
+
+            // Show loading state
+            placeholderState.classList.add('hidden');
+            reportOutput.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                // Call Gemini Flash API with structured response schema
+                const analysisResult = await callGeminiAnalysisAPI(text);
+                renderReport(analysisResult);
+            } catch (error) {
+                console.error("Analysis Error:", error);
+                // Fallback to local heuristic rule engine if API is unavailable or fails
+                const fallbackResult = localRuleEngine(text);
+                renderReport(fallbackResult);
+                showToast("Análisis completado mediante motor secundario de reglas");
+            } finally {
+                loadingState.classList.add('hidden');
+                analyzeBtn.disabled = false;
+                analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Fetch analysis using Gemini 3 Flash API
+        async function callGeminiAnalysisAPI(textToAnalyze) {
+            const apiKey = ""; // Canvas runtime environment automatically provides key
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const systemPrompt = `Eres un experto evaluador de verificación de datos (Fact-Checker) y sesgos discursivos. 
+Tu tarea es analizar minuciosamente el texto proporcionado por el usuario y evaluar su confiabilidad y nivel de riesgo.
+Debes responder ÚNICAMENTE en formato JSON estructurado siguiendo el esquema solicitado.
+
+Criterios de análisis:
+1. Afirmaciones absolutas o exageradas (ej. "todos", "indiscutible", "100%", "jamás").
+2. Lenguaje emocional o sesgado (subjetividad, juicios de valor).
+3. Falta de fuentes, atribución vaga o referencias a "estudios secretos/independientes no nombrados".
+4. Riesgos de salud, finanzas o consejos médicos sin respaldo científico claro.
+5. Califica el Nivel de Riesgo General en: "Bajo", "Medio" o "Alto".
+6. Asigna un porcentaje de Confiabilidad (0 a 100).`;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [{ text: `Analiza el siguiente texto:\n\n"${textToAnalyze}"` }]
+                    }
+                ],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            reliabilityScore: { type: "INTEGER", description: "Score from 0 (completely unreliable) to 100 (highly reliable)" },
+                            riskLevel: { type: "STRING", enum: ["Bajo", "Medio", "Alto"] },
+                            verdictTitle: { type: "STRING", description: "Short headline of findings" },
+                            verdictSummary: { type: "STRING", description: "Executive 2-sentence summary" },
+                            findings: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        category: { type: "STRING", description: "e.g., Afirmación Absoluta, Lenguaje Sesgado, Falta de Fuentes, Riesgo de Salud/Finanzas, Subjetividad" },
+                                        quote: { type: "STRING", description: "Exact excerpt or key fragment" },
+                                        explanation: { type: "STRING", description: "Why this is an issue" },
+                                        severity: { type: "STRING", enum: ["Baja", "Media", "Alta"] }
+                                    },
+                                    required: ["category", "quote", "explanation", "severity"]
+                                }
+                            },
+                            recommendations: {
+                                type: "ARRAY",
+                                items: { type: "STRING" },
+                                description: "Concrete steps to take before using or publishing this content"
+                            }
+                        },
+                        required: ["reliabilityScore", "riskLevel", "verdictTitle", "verdictSummary", "findings", "recommendations"]
+                    }
+                }
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API response status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!jsonText) throw new Error("Empty response from API");
+
+            return JSON.parse(jsonText);
+        }
+
+        // Local Rule Engine Fallback
+        function localRuleEngine(text) {
+            const lower = text.toLowerCase();
+            const findings = [];
+            let score = 85;
+            let risk = "Bajo";
+
+            // Rules check
+            if (/\b(absolutamente|100%|todos|nadie|indiscutible|obsoleto|jamás|siempre)\b/i.test(lower)) {
+                findings.push({
+                    category: "Afirmación Absoluta / Lenguaje Tajante",
+                    quote: "Términos como 'absolutamente', '100%', 'todos' o 'nadie'",
+                    explanation: "Generalizaciones categóricas que suelen restar objetividad académica o periodística.",
+                    severity: "Media"
+                });
+                score -= 20;
+            }
+
+            if (/\b(curar|cura|secreto|revolucionario|definitivamente|garantiza|sin efectos secundarios)\b/i.test(lower)) {
+                findings.push({
+                    category: "Riesgo de Salud / Promesa Exagerada",
+                    quote: "Mención de curas definitivas o tratamientos secretos",
+                    explanation: "Afirmaciones de salud no comprobadas científicamente que requieren validación médica.",
+                    severity: "Alta"
+                });
+                score -= 35;
+            }
+
+            if (!/\b(según|de acuerdo con|publicado por|estudio|informe|de fecha|investigación)\b/i.test(lower)) {
+                findings.push({
+                    category: "Falta de Atribución y Fuentes",
+                    quote: "Ausencia de citas claras",
+                    explanation: "No se identifican organizaciones, autores o documentos primarios que respalden la afirmación.",
+                    severity: "Media"
+                });
+                score -= 15;
+            }
+
+            score = Math.max(10, Math.min(100, score));
+
+            if (score < 45) risk = "Alto";
+            else if (score < 75) risk = "Medio";
+
+            return {
+                reliabilityScore: score,
+                riskLevel: risk,
+                verdictTitle: risk === "Alto" ? "Alto Riesgo de Desinformación o Sesgo" : (risk === "Medio" ? "Requiere Verificación Moderada" : "Texto Relativamente Objetivo"),
+                verdictSummary: `El análisis detectó ${findings.length} puntos de atención que conviene revisar antes de utilizar el contenido en un trabajo formal.`,
+                findings: findings.length > 0 ? findings : [{
+                    category: "Estructura Neutral",
+                    quote: "Texto general",
+                    explanation: "No se detectaron sesgos evidentes o afirmaciones de riesgo directo.",
+                    severity: "Baja"
+                }],
+                recommendations: [
+                    "Verifica las afirmaciones principales con al menos dos fuentes independientes.",
+                    "Sustituye adjetivos calificativos absolutos por matices u observaciones fundamentadas.",
+                    "Si contiene recomendaciones médicas o financieras, consulta canales oficiales."
+                ]
+            };
+        }
+
+        // Render JSON Report to UI
+        function renderReport(data) {
+            // Update Score Gauge
+            const score = data.reliabilityScore || 50;
+            scoreVal.textContent = `${score}%`;
+            
+            // Calculate stroke-dasharray (circumference ~ 100)
+            const strokeDashOffset = 100 - score;
+            gaugePath.style.strokeDasharray = `${score}, 100`;
+
+            // Risk Level Styling
+            let riskColorClass = "";
+            let riskBadgeBg = "";
+
+            if (data.riskLevel === "Bajo") {
+                gaugePath.className.baseVal = "gauge-circle text-emerald-500";
+                riskBadgeBg = "bg-emerald-100 text-emerald-800 border border-emerald-300";
+            } else if (data.riskLevel === "Medio") {
+                gaugePath.className.baseVal = "gauge-circle text-amber-500";
+                riskBadgeBg = "bg-amber-100 text-amber-800 border border-amber-300";
+            } else {
+                gaugePath.className.baseVal = "gauge-circle text-rose-500";
+                riskBadgeBg = "bg-rose-100 text-rose-800 border border-rose-300";
+            }
+
+            riskBadge.className = `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${riskBadgeBg}`;
+            riskBadge.textContent = `${data.riskLevel} RIESGO`;
+
+            verdictTitle.textContent = data.verdictTitle || "Informe de Análisis";
+            verdictSummary.textContent = data.verdictSummary || "Resultados del escaneo de sesgos y fuentes.";
+
+            // Render Findings List
+            findingsContainer.innerHTML = '';
+            const findings = data.findings || [];
+            findingsCount.textContent = `${findings.length} hallazgo${findings.length !== 1 ? 's' : ''}`;
+
+            findings.forEach((item) => {
+                let severityColor = "bg-slate-100 text-slate-700 border-slate-200";
+                let icon = "fa-info-circle text-blue-500";
+
+                if (item.severity === "Alta") {
+                    severityColor = "bg-rose-50 text-rose-800 border-rose-200";
+                    icon = "fa-triangle-exclamation text-rose-500";
+                } else if (item.severity === "Media") {
+                    severityColor = "bg-amber-50 text-amber-800 border-amber-200";
+                    icon = "fa-circle-exclamation text-amber-500";
+                } else {
+                    severityColor = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                    icon = "fa-check-circle text-emerald-500";
+                }
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl border text-xs sm:text-sm ${severityColor} space-y-1.5 transition`;
+                card.innerHTML = `
+                    <div class="flex items-center justify-between font-semibold">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid ${icon}"></i>
+                            ${escapeHtml(item.category)}
+                        </span>
+                        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-white/80 border border-slate-200">
+                            Gravedad: ${escapeHtml(item.severity)}
+                        </span>
+                    </div>
+                    ${item.quote ? `<p class="italic text-slate-700 bg-white/60 p-2 rounded border border-slate-200/50">"${escapeHtml(item.quote)}"</p>` : ''}
+                    <p class="text-slate-600">${escapeHtml(item.explanation)}</p>
+                `;
+                findingsContainer.appendChild(card);
+            });
+
+            // Render Recommendations Checklist
+            recommendationsList.innerHTML = '';
+            const recs = data.recommendations || [];
+            recs.forEach(rec => {
+                const li = document.createElement('li');
+                li.className = "flex items-start gap-2.5";
+                li.innerHTML = `
+                    <i class="fa-solid fa-square-check text-blue-400 mt-0.5 shrink-0"></i>
+                    <span>${escapeHtml(rec)}</span>
+                `;
+                recommendationsList.appendChild(li);
+            });
+
+            // Display Report
+            reportOutput.classList.remove('hidden');
+            reportOutput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Helper to copy structured report to clipboard
+        function copyReport() {
+            const risk = riskBadge.textContent.trim();
+            const score = scoreVal.textContent.trim();
+            const title = verdictTitle.textContent.trim();
+            const summary = verdictSummary.textContent.trim();
+
+            const reportText = `--- INFORME DE FACT-CHECKING Y SESGOS ---
+Nivel de Riesgo: ${risk}
+Índice de Confiabilidad: ${score}
+Resumen: ${title} - ${summary}
+
+Desarrollado por Lizbeth Belinda Chura Lima`;
+
+            const textarea = document.createElement('textarea');
+            textarea.value = reportText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            showToast("Informe copiado al portapapeles");
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
